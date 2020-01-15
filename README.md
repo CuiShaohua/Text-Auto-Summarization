@@ -20,11 +20,16 @@ ____
 ____
 &ensp;&ensp; 首先，我们先把每个句子进行一个多维的向量表征（主流使用使用词向量，可以是基于Word2vec，cove， glove，bert等一些主流的词向量训练方法），当然采用keras进行训练的话，也可以不用获取词向量，让其自动训练一个Embedding层即可，但本文采用的是已经训练好的模型（语料来源于中文wiki百科和搜狗新闻语料）[另外也可参考连接](https://github.com/Embedding/Chinese-Word-Vectors)，该种方法在深度学习上也叫采用预训练模型的方式。  
 
+#### 2.1 如何表征一个句向量，并且怎么衡量该句向量对文章向量的重要程度？
+&ensp;&ensp; 目前已经获取句向量的方法，常见的获取句向量的是加权句子包含词向量的思想，简单粗暴的有累加、平均、TF-IDF做权值和ISF加权。本文使用的是普林斯顿研究的方法，属于ISF方法，具体可以参考论文[A Latent Variable Model Approach to PMI-based Word Embeddings](https://arxiv.org/abs/1502.03520)，该论文17年发表，在有监督学习盛行的情况下，仍能曾获得业内的较高评价，可见方法的准确度较高。该方法需要在PCA的基础上求解协方差的第一特征向量作为句子向量的代表。具体PCA的原理，可以参考我的一篇[文章]()
 
 
 
 
 ### 参考文献
 
-[1] A Neural Attention Model for Abstractive Sentence Summarization https://arxiv.org/abs/1509.00685
+[1] A Neural Attention Model for Abstractive Sentence Summarization https://arxiv.org/abs/1509.00685  
+[2] A Latent Variable Model Approach to PMI-based Word Embeddings https://arxiv.org/abs/1502.03520
+[3] 
+
 
