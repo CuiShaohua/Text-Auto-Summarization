@@ -40,9 +40,38 @@ ____
 >> *  向量法盛行天下开始，在计算广告学等领域，推荐系统的本身是相似度和排序的使用，那么上述PCA将单个句子和单个文本都拿做一个向量来处置是十分恰当的，PCA降维之后，我们能够获得协方差矩阵第一特征向量，其在图上相当于做了某个方向的取向，句子向量与文本向量的余弦相似度越小，那么说明两者的取向相近，用这种似有监督却无监督的方法可以衡量每个句子对文本向量取向的贡献程度，也就是第一个问题解决了。  
 #### 2.2 借助LDA求取文章的主题句
 >> [LDA是什么？](https://zhuanlan.zhihu.com/p/31470216)， LDA是一种有监督的数据降维方法。我们知道即使在训练样本上，我们提供了类别标签，在使用PCA模型的时候，我们是不利用类别标签的，而LDA在进行数据降维的时候是利用数据的类别标签提供的信息的。 
-从几何的角度来看，PCA和LDA都是讲数据投影到新的相互正交的坐标轴上。只不过在投影的过程中他们使用的约束是不同的，也可以说目标是不同的。PCA是将数据投影到方差最大的几个相互正交的方向上，以期待保留最多的样本信息。样本的方差越大表示样本的多样性越好，在训练模型的时候，我们当然希望数据的差别越大越好。否则即使样本很多但是他们彼此相似或者相同，提供的样本信息将相同，相当于只有很少的样本提供信息是有用的。样本信息不足将导致模型性能不够理想。这就是PCA降维的目标：将数据投影到方差最大的几个相互正交的方向上。而LDA是将带有标签的数据降维，投影到低维空间同时满足三个条件：尽可能多地保留数据样本的信息（即选择最大的特征是对应的特征向量所代表的的方向）。寻找使样本尽可能好分的最佳投影方向。投影后使得同类样本尽可能近，不同类样本尽可能远。具体实现代码可以参考我的一篇[文章]()。部分关键代码如下：  
+从几何的角度来看，PCA和LDA都是讲数据投影到新的相互正交的坐标轴上。只不过在投影的过程中他们使用的约束是不同的，也可以说目标是不同的。PCA是将数据投影到方差最大的几个相互正交的方向上，以期待保留最多的样本信息。样本的方差越大表示样本的多样性越好，在训练模型的时候，我们当然希望数据的差别越大越好。否则即使样本很多但是他们彼此相似或者相同，提供的样本信息将相同，相当于只有很少的样本提供信息是有用的。样本信息不足将导致模型性能不够理想。这就是PCA降维的目标：将数据投影到方差最大的几个相互正交的方向上。而LDA是将带有标签的数据降维，投影到低维空间同时满足三个条件：尽可能多地保留数据样本的信息（即选择最大的特征是对应的特征向量所代表的的方向）。寻找使样本尽可能好分的最佳投影方向。投影后使得同类样本尽可能近，不同类样本尽可能远。具体实现代码可以参考我的一篇[文章](https://github.com/CuiShaohua/AutoSummarizzation/blob/master/lda_processing.py)。部分关键代码如下：  
 ```Ptthon  
+def lda_process(split_text, embedding_size, wordvec):
+    new_line, new_dict = [], []
+    for line in split_text:
+        for w in line.split():
+            if w in stopwords: continue
+            new_line.append(w)
+        new_dict.append(new_line)
+        new_line = []
 
+    dictionary = Dictionary(new_dict)
+
+    corpus = [ dictionary.doc2bow(text) for text in new_dict ]
+    lda = LdaModel(corpus=corpus, id2word=dictionary, num_topics=1,passes=20)
+
+    _, title_terms = lda.print_topics(num_words = 5)[0]
+
+    title_vec = []
+
+    sub_terms = title_terms.split('+')
+    for term in sub_terms:
+        listItems = term.split('*')
+        try:
+            title_vec.append(float(listItems[0]) * wordvec[re.findall(r'\"(.+)\"',listItems[1])[0]])
+        except KeyError:
+            title_vec.append(float(listItems[0]) * np.zeros(embedding_size))
+    #print(wordvec[re.findall(r'\"(.+)\"',listItems[1])])
+
+    title_vector = np.average(np.array(title_vec), axis=0)
+
+    return title_vector.reshape(1,300)
 ```
 ### 2.3 关键词textRank  
 >> 想必做NLP方向的各位同袍，应该对TextRank比较熟悉，TextRank可以看做是PageRank的2.0版本，而[PageRank](http://pr.efactory.de/e-pagerank-algorithm.shtml)可是谷歌发家致富的重要基石，通过爬取大量网页被引用指向，构成G引用矩阵，最终计算G矩阵的特征向量（每个元素代表一个网页的PageRank）$$ G=S*a+（1-a）*U*\frac{1}{n} $$。那么我们来看下jieba库中的TextRank如何实现的  
@@ -356,82 +385,82 @@ if __name__ == '__main__':
 ### 3 前端展示部分  
 
 #### 3.1 目录结构
-.
-├── app.py
-├── index.html
-├── __init__.py
-├── keywords_weight.py
-├── knn_smooth.py
-├── lda_processing.py
-├── main_pro2.py
-├── model
-│   ├── wiki_bigram.vec
-├── myflask
-├── my_threading.py
-├── nohup.out
-├── pickup.py
-├── preprocess_autosummary
-│   ├── get_word_frequency.py
-│   ├── __init__.py
-│   └── sentence_and_doc.py
-├── sents2vec.py
-├── static
-│   ├── backgroup.png
-│   ├── css
-│   │   ├── 5db11ff4gw1e77d3nqrv8j203b03cweg.jpg
-│   │   ├── bower.json
-│   │   ├── chat.css
-│   │   ├── h.jpg
-│   │   ├── hm.js.下载
-│   │   ├── host.jpg
-│   │   ├── h.png
-│   │   ├── hs.jpg
-│   │   ├── jquery.js
-│   │   ├── layui.all.js
-│   │   ├── layui.css
-│   │   ├── layui.js
-│   │   ├── layui.js.下载
-│   │   ├── layui.mobile.css
-│   │   ├── modules
-│   ├── element.js
-│   ├── font
-│   │   ├── iconfont.eot
-│   │   ├── iconfont.svg
-│   │   ├── iconfont.ttf
-│   │   ├── iconfont.woff
-│   │   └── iconfont.woff2
-│   ├── images
-│   │   ├── backgroup.png
-│   │   ├── bg.jpeg
-│   │   ├── h1.png
-│   │   ├── h.jpg
-│   │   ├── h.png
-│   │   ├── hs.jpg
-│   │   └── tab.png
-│   ├── jquery-3.4.1.js
-│   ├── jquery.js
-│   ├── lay
-│   ├── layui.js.下载
-└── templates
-    ├── autoSummary.html
-    ├── base.html
-    ├── demo1.html
-    ├── hello.html
-    ├── index.html.bak
-    ├── jquery.js
-    ├── news-extraction.html
-    ├── pvuv.html
-    ├── qunliao.html
-    ├── ss.html
-    ├── testform.html
-    ├── use_template.html
-    └── web_sckone.html
+.  
+├── app.py  
+├── index.html  
+├── __init__.py  
+├── keywords_weight.py  
+├── knn_smooth.py  
+├── lda_processing.py  
+├── main_pro2.py  
+├── model  
+│   ├── wiki_bigram.vec  
+├── myflask  
+├── my_threading.py  
+├── nohup.out  
+├── pickup.py  
+├── preprocess_autosummary  
+│   ├── get_word_frequency.py  
+│   ├── __init__.py  
+│   └── sentence_and_doc.py  
+├── sents2vec.py  
+├── static  
+│   ├── backgroup.png  
+│   ├── css  
+│   │   ├── 5db11ff4gw1e77d3nqrv8j203b03cweg.jpg  
+│   │   ├── bower.json  
+│   │   ├── chat.css  
+│   │   ├── h.jpg  
+│   │   ├── hm.js.下载  
+│   │   ├── host.jpg  
+│   │   ├── h.png  
+│   │   ├── hs.jpg  
+│   │   ├── jquery.js  
+│   │   ├── layui.all.js  
+│   │   ├── layui.css  
+│   │   ├── layui.js  
+│   │   ├── layui.js.下载  
+│   │   ├── layui.mobile.css  
+│   │   ├── modules  
+│   ├── element.js  
+│   ├── font  
+│   │   ├── iconfont.eot  
+│   │   ├── iconfont.svg  
+│   │   ├── iconfont.ttf  
+│   │   ├── iconfont.woff  
+│   │   └── iconfont.woff2  
+│   ├── images    
+│   │   ├── backgroup.png  
+│   │   ├── bg.jpeg  
+│   │   ├── h1.png  
+│   │   ├── h.jpg  
+│   │   ├── h.png  
+│   │   ├── hs.jpg  
+│   │   └── tab.png  
+│   ├── jquery-3.4.1.js  
+│   ├── jquery.js  
+│   ├── lay  
+│   ├── layui.js.下载  
+└── templates  
+    ├── autoSummary.html  
+    ├── base.html  
+    ├── demo1.html  
+    ├── hello.html  
+    ├── index.html.bak  
+    ├── jquery.js  
+    ├── news-extraction.html  
+    ├── pvuv.html  
+    ├── qunliao.html  
+    ├── ss.html  
+    ├── testform.html  
+    ├── use_template.html  
+    └── web_sckone.html  
 
 163 directories, 750 files
 
 #### 3.2 展示效果
-![提交前]()  
-![提交后]()
+![提交前](https://raw.githubusercontent.com/CuiShaohua/AutoSummarizzation/master/pro2_1.png)  
+![提交后](https://raw.githubusercontent.com/CuiShaohua/AutoSummarizzation/master/pro2_2.png)
 
 
 ### 参考文献
