@@ -45,15 +45,19 @@ ____
 
 ```
 ### 2.3 关键词textRank  
->> 想必做NLP方向的各位同袍，应该对TextRank比较熟悉，TextRank可以看做是PageRank的2.0版本，而[PageRank](http://pr.efactory.de/e-pagerank-algorithm.shtml)可是谷歌发家致富的重要基石，通过爬取大量网页被引用指向，构成G引用矩阵，计算特征向量（每个元素代表一个网页的PageRank）$$ G=S*a+（1-a）*U*1/n $$
+>> 想必做NLP方向的各位同袍，应该对TextRank比较熟悉，TextRank可以看做是PageRank的2.0版本，而[PageRank](http://pr.efactory.de/e-pagerank-algorithm.shtml)可是谷歌发家致富的重要基石，通过爬取大量网页被引用指向，构成G引用矩阵，计算特征向量（每个元素代表一个网页的PageRank）  
+$$ G=S*a+（1-a）*U*1/n $$
 
 
 ### 参考文献
-[1]: Blei, D. M., Ng, A. Y., & Jordan, M. I. (2003). Latent dirichlet allocation. Journal of machine Learning research, 3(Jan), 993-1022.
+[1] A Neural Attention Model for Abstractive Sentence Summarization https://arxiv.org/abs/1509.00685  
+[2] A Latent Variable Model Approach to PMI-based Word Embeddings https://arxiv.org/abs/1502.03520  
 
-[2]: Hofmann, T. (1999). Probabilistic latent semantic indexing. In Proceedings of the 22nd annual international ACM SIGIR conference on Research and development in information retrieval (pp. 50-57). ACM.
+[3]: Blei, D. M., Ng, A. Y., & Jordan, M. I. (2003). Latent dirichlet allocation. Journal of machine Learning research, 3(Jan), 993-1022.
 
-[3]: Li, F., Huang, M., & Zhu, X. (2010). Sentiment Analysis with Global Topics and Local Dependency. In AAAI (Vol. 10, pp. 1371-1376).
+[4]: Hofmann, T. (1999). Probabilistic latent semantic indexing. In Proceedings of the 22nd annual international ACM SIGIR conference on Research and development in information retrieval (pp. 50-57). ACM.
 
-[4]: Medhat, W., Hassan, A., & Korashy, H. (2014). Sentiment analysis algorithms and applications: A survey. Ain Shams Engineering Journal, 5(4), 1093-1113.
+[5]: Li, F., Huang, M., & Zhu, X. (2010). Sentiment Analysis with Global Topics and Local Dependency. In AAAI (Vol. 10, pp. 1371-1376).
+
+[6]: Medhat, W., Hassan, A., & Korashy, H. (2014). Sentiment analysis algorithms and applications: A survey. Ain Shams Engineering Journal, 5(4), 1093-1113.
 
