@@ -159,7 +159,279 @@ class TextRank(KeywordExtractor):
     extract_tags = textrank
 
 ```
+* 读到这里，我们可以发现，已经将底层的部分全部做完了。在上层之后，我们该思考，如何确定将这些表征句子权重、主题打分、关键词进行一个有效的结合？  
+#### 2.4 加权是王道，但又如何控制一个有效的权重？  
+>>> 这个问题其实不好解答，笔者在写项目的过程中也是求教了几位行业人士，但在权重配置上，很难有一个足够精确的方法，是给予sentence vector的权重高一些，还是给LDA的权重高一些，很难评判。那么人难以评判，机器能不能来做评判？（机器学习的思想），答案是否定的，据我了解，目前对摘要的准确度评测方法大多还没有公开见效（中文）。但异想天开一把，如果翻译模型足够强大，将现有的英文摘要（基于深度学习的方法）训练一个模型，然后将该模型（先可以理解为Encoder-Decoder模型），再通过迁移学习，是否有可能嫁接到中文摘要的test集上，当然本文调测的方法还是以具有代表性的新华社新闻稿当做validation集，选择50-100个新闻稿，最终将Sentence Vector权重定为0.6，而主题Vector的权重定为0.4来进行预测。
 
+#### 2.5 其他容易被忽视的小问题   
+
+>>> * 新闻稿总有个人物、时间；  
+
+>>> * 新闻稿也总有个字数的缩句要求（但本文还是主张自由开放一些，没有写规则定义字数限制这一点。）  
+
+*** 最后献上主代码程序  
+```Python
+import pickle as pkl
+import os, jieba, re
+import numpy as np
+from gensim.models import KeyedVectors
+from sents2vec import sents2vec
+from preprocess_autosummary.sentence_and_doc import Word, Sentence, Document
+from sklearn.metrics.pairwise import cosine_similarity
+from lda_processing import lda_process
+from keywords_weight import keywords_weight
+from knn_smooth import knn_smooth
+from my_threading import MyThread
+
+# 恢复标点
+def dict_leagal(sents, subsents_dict):
+    sub_dict = {}
+    sub_sents_set = set()
+    m = subsents_dict[0][1]
+    sub_dict[subsents_dict[0][0]] = sents[m]
+
+    for j, k in subsents_dict[1:]:
+
+        m += k + 1
+        if j not in sub_sents_set:
+            sub_sents_set.add(j)
+            try:
+                if sents[m] not in '。，？！：':
+                    print('输入的句子不合法，标点符号缺失')
+                else:
+                    sub_dict[j] = sents[m]
+
+            except IndexError:
+                return "句子不合法"
+    return sub_dict
+
+
+def read_wordvec_pkl(wordvec_file):
+
+    if os.path.exists(wordvec_file):
+        f = open(wordvec_file, 'rb')
+        wordvec = pkl.load(f)
+        f.close()
+    else:
+        wordvecPath = "D:\AI\Jupyter\sgns.wiki.bigram/sgns.wiki.bigram"
+        wordvec = KeyedVectors.load_word2vec_format(wordvecPath)
+        with open('./wiki_bigram.vec', 'wb') as f:
+            pkl.dump(wordvec, f)
+    return wordvec
+
+def read_wordfreq_pkl(freq_file):
+
+    if os.path.exists(freq_file):
+        f = open(freq_file, 'rb')
+        mydict = pkl.load(f)
+        f.close()
+    else:
+        with open('./word_freq', 'rb') as foup:
+            mydict = pkl.load(foup)  # return mydict
+    return mydict
+
+
+def time_and_place_match(text, patten):
+    for i in text:
+        if re.findall(patten, string=i):
+            return i
+    return 0
+    # print('task' + str(patten) + 'has done!')
+
+
+import time
+# main function
+def autoSummary():
+
+    # pre-pate: load pre-trained wordvec form pkl-file
+
+    wordvec_file = 'wiki_bigram.vec'
+    read_wordvec = MyThread(func=read_wordvec_pkl, args=(wordvec_file,))
+    # read freq_file
+    freq_file = "word_freq"
+    read_wordfreq = MyThread(func=read_wordfreq_pkl, args=(freq_file,))
+
+    read_wordvec.start()
+    read_wordfreq.start()
+    read_wordvec.join()
+    read_wordfreq.join()
+
+    wordvec = read_wordvec.get_result()
+    mydict = read_wordfreq.get_result()
+
+    # 0 提示用户输入文章
+    sentence = input("请输入文档：")
+    pattern = re.compile(r'[。，？！：]')
+    start = time.time()
+    # 提取关键词
+    keywords = keywords_weight(sentence)
+
+    # split是包含子句子的结果，也是程序的入口
+    split = pattern.sub(' ', sentence).split()
+
+    # 如果句子条数小于3，那么直接返回该句子
+    if len(split) <=3:
+        return sentence
+    # 建立标点字典
+    subsents_dict = [(w, len(w)) for w in split]
+    sub_dict = dict_leagal(sentence, subsents_dict)
+
+    # 分词
+    sent_split = [' '.join(jieba.cut(n, cut_all=False)) for n in split if n]  # 存储的句子列表  --> 已经分词之后的结果
+
+    # 从这开始分支，PCA 和 LDA分别进行
+    # PCA
+    embedding_size = 300
+    word_set, sents_set = [], []
+
+    for sent in sent_split:
+        for word in sent.split():
+            try:
+                if word in keywords.keys():
+                    word_set.append(Word(word, wordvec[word]* keywords[word]))
+                else:
+                    word_set.append(Word(word, wordvec[word]))
+            except KeyError:
+                word_set.append(Word(word, np.zeros(embedding_size)))
+        sents_set.append(Sentence(word_set))
+        word_set = []
+    # 句子向量sentvec_set 文章向量
+    doc_vec = Document(sents_set)
+    # 1 输出句子向量和文章向量的余弦相似度
+    sents_vector = sents2vec(sents_set, embedding_size, mydict)
+    doc_vector  = sents2vec([doc_vec], embedding_size, mydict)
+    # 相似度，子句子和文章的相似度
+    pca_cos_similarity = cosine_similarity(sents_vector,Y=doc_vector)
+    L = pca_cos_similarity.reshape(-1)
+    # 2 提炼主题句子  LDA
+    lda_vector = lda_process(split_text=sent_split,embedding_size=embedding_size,wordvec=wordvec)
+    lda_cos_similarity = cosine_similarity(sents_vector,Y=lda_vector)
+    M = lda_cos_similarity.reshape(-1)
+    # 3 KNN平滑
+    #  加权相似度。0.5 * sub句子/文章向量 + （1-0.5）* sub句子/主题向量
+    pca_weight = 0.6
+    total_similarity = pca_weight * knn_smooth(L) + (1-pca_weight) * knn_smooth(M)
+
+    # 4 句子重组和输出
+    # 4.1 考虑首句和尾句，此处没有考虑首句和尾句的重要作用，只考虑了是谁报道，什么时间发生
+    time_patten = r'[.+月.+日|当地时间.+|北京时间.+|.+月|.+日]'
+    place_patten = r'[.+电，|据.+报道]'
+    time_match = time_and_place_match(split[:3], time_patten)
+    place_match = time_and_place_match(split[:3], place_patten)
+    # 4.2 检测字数
+    word_num = 80
+    # 4.3 标点的恢复。
+    t_initial = 0.4  # similarity threshoud initial
+    t_end = 0.45
+    biaodian = []
+    for i in range(len(total_similarity)):
+        if total_similarity[i] >= t_initial:
+            sents_result = ''.join([j.text for j in sents_set[i].word_list])
+            #print(sents_result, end=sub_dict[sents_result])
+            biaodian.append((sents_result, sub_dict[sents_result]))
+
+    try:
+
+        if time_match != 0 and np.sum((np.array([i[0] for i in biaodian]) == time_match).astype('float')) == 0.:
+        #if np.sum((np.array([i[0] for i in biaodian]) == time_match).astype('float')) == 0.:
+            biaodian.insert(split.index(time_match), (time_match, sub_dict[time_match]))
+        if place_match != 0 and np.sum((np.array([i[0] for i in biaodian]) == place_match).astype('float')) == 0.:
+            biaodian.insert(split.index(place_match), (place_match, sub_dict[place_match]))
+        '''
+        if np.sum((np.array([i[0] for i in biaodian]) == place_match).astype('float')) == 0.:
+            biaodian.insert(split.index(place_match), (place_match, sub_dict[place_match]))
+        '''
+    except Exception as E:
+        print(E)
+    #for Iterms in biaodian:
+    return ''.join([iterm[0]+iterm[1] for iterm in biaodian])
+
+def main():
+    return autoSummary()
+
+if __name__ == '__main__':
+    print(main())
+
+```
+### 3 前端展示部分  
+
+#### 3.1 目录结构
+.
+├── app.py
+├── index.html
+├── __init__.py
+├── keywords_weight.py
+├── knn_smooth.py
+├── lda_processing.py
+├── main_pro2.py
+├── model
+│   ├── wiki_bigram.vec
+├── myflask
+├── my_threading.py
+├── nohup.out
+├── pickup.py
+├── preprocess_autosummary
+│   ├── get_word_frequency.py
+│   ├── __init__.py
+│   └── sentence_and_doc.py
+├── sents2vec.py
+├── static
+│   ├── backgroup.png
+│   ├── css
+│   │   ├── 5db11ff4gw1e77d3nqrv8j203b03cweg.jpg
+│   │   ├── bower.json
+│   │   ├── chat.css
+│   │   ├── h.jpg
+│   │   ├── hm.js.下载
+│   │   ├── host.jpg
+│   │   ├── h.png
+│   │   ├── hs.jpg
+│   │   ├── jquery.js
+│   │   ├── layui.all.js
+│   │   ├── layui.css
+│   │   ├── layui.js
+│   │   ├── layui.js.下载
+│   │   ├── layui.mobile.css
+│   │   ├── modules
+│   ├── element.js
+│   ├── font
+│   │   ├── iconfont.eot
+│   │   ├── iconfont.svg
+│   │   ├── iconfont.ttf
+│   │   ├── iconfont.woff
+│   │   └── iconfont.woff2
+│   ├── images
+│   │   ├── backgroup.png
+│   │   ├── bg.jpeg
+│   │   ├── h1.png
+│   │   ├── h.jpg
+│   │   ├── h.png
+│   │   ├── hs.jpg
+│   │   └── tab.png
+│   ├── jquery-3.4.1.js
+│   ├── jquery.js
+│   ├── lay
+│   ├── layui.js.下载
+└── templates
+    ├── autoSummary.html
+    ├── base.html
+    ├── demo1.html
+    ├── hello.html
+    ├── index.html.bak
+    ├── jquery.js
+    ├── news-extraction.html
+    ├── pvuv.html
+    ├── qunliao.html
+    ├── ss.html
+    ├── testform.html
+    ├── use_template.html
+    └── web_sckone.html
+
+163 directories, 750 files
+
+#### 3.2 展示效果
+![提交前]()  
+![提交后]()
 
 
 ### 参考文献
