@@ -1,4 +1,4 @@
-# AutoSummarizzation
+# AutoSummarization
 #####  text zuto summarization for news 
 ### 0 写在前
 >>  <font size=16> &ensp;&ensp; 目前不论是大小云厂商还是提供SaaS服务的AI企业，大多推出了文本自动摘要这一功能。华为云去年之前还未做这个功能，但目前已经在EI里推出了这个功能。笔者在根据开课吧学习AI知识之后，将文本自动摘要采用无监督的方式进行实现，并且结合Flask进行项目展示。  
